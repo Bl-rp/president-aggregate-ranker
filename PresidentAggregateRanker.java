@@ -45,15 +45,20 @@ import com.opencsv.CSVReader;
  * {@code =importHTML("https://en.wikipedia.org/wiki/Historical_rankings_of_presidents_of_the_United_States";"table";1)} into a cell, then download
  * as .csv.
  * 
+ * <p>To run this program, download the .jar from the 'releases' tab of the project's
+ * <a href="https://github.com/Bl-rp/president-aggregate-ranker">GitHub page</a>, and then run it. To run .jar files you need to have Java installed,
+ * then open console (Command Prompt on Windows), go to the folder where the .jar is located and enter {@code java -jar JARNAME.jar arg1 arg2 arg3}
+ * (you can have any number of arguments ({@code arg}) including none), where {@code JARNAME} is the name of the .jar file.
+ * 
  * <p><b>Usage</b>: if the first argument is {@code --help}, prints short help text describing usage, then exits. If the first argument is
- * {@code --doc}, creates javadoc files in folder {@code JARNAME_doc}, where {@code JARNAME} is the name of the .jar being run, in current folder and
- * opens the main class' documentation file in the default .html program, then exits; if the doc folder (or a file with that name) already exists,
- * prompts user for whether to empty it (or if it's a file, delete it) or cancel and exit unless there's a second argument which is then taken as the
- * answer which should be {@code y} if yes and anything else for no. If the first argument is not {@code --help} or {@code --doc}, first argument is
- * taken as the path to the .csv file; if no arguments, path {@code US-president-rankings-table.csv} is taken as default, and if the table is not
- * found at this location, the user is prompted for the path. Second argument should be {@code y} if the table already has an aggregate, and anything
- * else otherwise; this is only used if no aggregate is found. If {@code y}, the program prints an error message and exits; otherwise the program
- * proceeds. If no second argument, the user is prompted for input as needed.
+ * {@code --doc}, creates javadoc files in folder {@code JARNAME_doc} - where, again, {@code JARNAME} is the name of the .jar being run - within the
+ * .jar's folder and opens the main class' documentation file in the default .html program, then exits; if the doc folder (or a file with that name)
+ * already exists, prompts user for whether to empty it (or if it's a file, delete it) or cancel and exit unless there's a second argument which is
+ * then taken as the answer which should be {@code y} if yes and anything else for no. If the first argument is not {@code --help} or {@code --doc},
+ * first argument is taken as the path to the .csv file; if no arguments, path {@code US-president-rankings-table.csv} is taken as default, and if
+ * the table is not found at this location, the user is prompted for the path. Second argument should be {@code y} if the table already has an
+ * aggregate, and anything else otherwise; this is only used if no aggregate is found. If {@code y}, the program prints an error message and exits;
+ * otherwise the program proceeds. If no second argument, the user is prompted for input as needed.
  * 
  * <p>The table is assumed to contain individual presidents in each row except the first and last, and individual polls in each column except the
  * first three and, if the table has an aggregate, the last. The first row should be a header and the last should display total number of presidents
@@ -324,6 +329,133 @@ public class PresidentAggregateRanker {
 		return negative ? result : -result;
 	}
 	
+	private static void createAndOpenJavadoc(String[] args) {
+		/* create documentation files in folder JARNAME_doc where JARNAME.jar is the jar file's name, then open documentation for this class in the
+		 * default .html program
+		 */
+		
+		@SuppressWarnings("resource")
+		Scanner sc = new Scanner(System.in);
+		
+		// get path to this class within the jar, as well as the path of the jar
+		String pathInJar = PresidentAggregateRanker.class.getResource(PresidentAggregateRanker.class.getSimpleName() + ".class").getFile();
+		URL resource = ClassLoader.getSystemClassLoader().getResource(pathInJar);
+		if (resource == null) {
+			System.out.println("Program does not appear to be run from a .jar file; exiting.");
+			return;
+		}
+		String jarPathString = resource.getFile();
+		jarPathString = jarPathString.substring(6, jarPathString.lastIndexOf('!'));
+		
+		boolean jarInitSuccess = false; // if initializing or closing ZipFile throws IOException, this tells us which one
+		try (ZipFile jar = new ZipFile(jarPathString)) {
+			jarInitSuccess = true;
+			
+			// get path of the doc directory we will create
+			Path jarPath = Paths.get(jarPathString);
+			String jarName = jarPath.getFileName().toString();
+			int extIndex = jarName.lastIndexOf('.');
+			if (extIndex != -1)
+				jarName = jarName.substring(0, extIndex);
+			Path docDirectory = jarPath.getParent().resolve(jarName + "_doc");
+			boolean docDirectoryAlreadyExists = false;
+			
+			if (Files.exists(docDirectory, LinkOption.NOFOLLOW_LINKS)) {
+				// if doc folder already exists, empty it (or if it's not a folder, delete it) or exit
+				
+				boolean isDirectory = Files.isDirectory(docDirectory, LinkOption.NOFOLLOW_LINKS);
+				docDirectoryAlreadyExists = isDirectory;
+					
+				System.out.println((isDirectory ? "Doc folder already exists: " : "File already exists with doc folder's name: ") + docDirectory);
+				boolean askToDelete = args.length < 2 || args[1] == null;
+				boolean deleteDocs = askToDelete ? false : args[1].equals("y");
+				if (askToDelete) {
+					System.out.print((isDirectory ? "Delete doc folder contents?" : "Delete file?") + " (Otherwise exits.) If yes enter \"y\": ");
+					deleteDocs = sc.nextLine().equalsIgnoreCase("y");
+				}
+				
+				if (deleteDocs)
+					try {
+						if (isDirectory) {
+							emptyFolder(docDirectory);
+							System.out.println("Doc folder contents deleted.");
+						} else {
+							Files.delete(docDirectory);
+							System.out.println("File deleted.");
+						}
+					} catch (IOException e) {
+						System.out.println((isDirectory ? "ERROR: failed to delete doc folder contents." : "ERROR: failed to delete file.")
+								+ " Error message:");
+						e.printStackTrace();
+						return;
+					}
+				else
+					return;
+			}
+			
+			if (!docDirectoryAlreadyExists) // create doc folder
+				try {
+					Files.createDirectory(docDirectory);
+					System.out.println("Doc folder created: " + docDirectory);
+				} catch (IOException e) {
+					System.out.println("ERROR: doc folder creation failed: " + docDirectory);
+					System.out.println("Error message:");
+					e.printStackTrace();
+					return;
+				}
+			
+			// create documentation files
+			try {
+				for (ZipEntry entry : Collections.list(jar.entries())) {
+					if (entry.getName().startsWith("doc/")) {
+						String[] pathComponents = entry.getName().substring("doc/".length()).split("/");
+						Path outputFile = Paths.get(docDirectory.toString(), pathComponents);
+						
+						// if entry is directory create entry, otherwise create entry's parent folder
+						boolean entryIsDirectory = entry.isDirectory();
+						Files.createDirectories(entryIsDirectory ? outputFile : outputFile.getParent());
+						
+						// write to file
+						if (!entryIsDirectory)
+							try (
+									InputStream in = jar.getInputStream(entry);
+									OutputStream out = new FileOutputStream(outputFile.toString());
+							) {
+								byte[] buffer = new byte[in.available()];
+								in.read(buffer);
+								out.write(buffer);
+							}
+					}
+				}
+			} catch (IOException e) {
+				System.out.println("ERROR: failed to create documentation. Error message:");
+				e.printStackTrace();
+				return;
+			}
+			System.out.println("Documentation created.");
+			
+			// open documentation
+			try {
+				Path htmlPath = Paths.get(docDirectory.toString(), (pathInJar.substring(0, pathInJar.length() - "class".length()) + "html")
+						.split("/"));
+				Desktop.getDesktop().open(htmlPath.toFile());
+			} catch (IOException e) {
+				System.out.println("ERROR: failed to open documentation. Error message:");
+				e.printStackTrace();
+				return;
+			}
+			System.out.println("Documentation opened.");
+			
+		} catch (IOException e) { // this can happen during initialization or closing of ZipFile
+			if (jarInitSuccess)
+				System.out.println("ERROR: failed to close stream (you don't need to care about this). Error message:");
+			else
+				System.out.println("ERROR: failed to open .jar file for reading. Error message:");
+			e.printStackTrace();
+			return;
+		}
+	}
+	
 	/**
 	 * @param args first argument (optional) is path to .csv file; second argument (optional) is {@code y} if table has aggregate (only used if
 	 * aggregate is not found in table) and anything else otherwise. Alternatively, if first argument is {@code --help}, prints help text, or if
@@ -332,9 +464,6 @@ public class PresidentAggregateRanker {
 	 * doc folder is to be emptied (or, if it's a file, it is to be deleted) before proceeding and anything else if program is to cancel and exit
 	 */
 	public static void main(String[] args) {
-		@SuppressWarnings("resource")
-		Scanner sc = new Scanner(System.in);
-		
 		System.out.println();
 		
 		if (args != null && args.length != 0 && args[0] != null) {
@@ -347,148 +476,27 @@ public class PresidentAggregateRanker {
 						+ "For more information, run the program with argument \"--doc\"."
 						+ "\n\n"
 						+ "USAGE: to run the program, enter \"java -jar JARNAME.jar arg1 arg2\" where JARNAME is the name of the .jar file and arg1 "
-						+ "and arg2 are the (optional) arguments. If arg1 is \"--help\", the program prints help text and exists. If arg1 is "
+						+ "and arg2 are the (optional) arguments. If arg1 is \"--help\", the program prints help text and exits. If arg1 is "
 						+ "\"--doc\", documentation files are created in the folder JARNAME_doc within the .jar file's folder, and the "
 						+ "documentation is then opened in the default program for .html files (probably your web browser); the program then exits. "
 						+ "If the doc folder already exists (or a file with that name) and arg2 is given, the folder will be emptied (or deleted if "
 						+ "it's a file) if arg2 is \"y\" and exit otherwise; if arg2 is not given, the user will be prompted. If arg1 is not "
 						+ "\"--help\" or \"--doc\", arg1 is taken as the path to the .csv file. If no arguments, the default path for the .csv file "
-						+ "is \"US-president-rankings-table.csv\" in the .jar file's folder. If the file isn't found at this location, the user "
-						+ "will be prompted for the path. arg2, if given, should be \"y\" if the table has an aggregate and anything else "
-						+ "otherwise. It is only used if no aggregate is found in the table, and if not given, the user will be prompted at this "
-						+ "point. If \"y\", the program prints an error message and exits; otherwise the program proceeds.");
+						+ "is \"US-president-rankings-table.csv\". If the file isn't found at this location, the user will be prompted for the "
+						+ "path. arg2, if given, should be \"y\" if the table has an aggregate and anything else otherwise. It is only used if no "
+						+ "aggregate is found in the table, and if not given, the user will be prompted at this point. If \"y\", the program prints "
+						+ "an error message and exits; otherwise the program proceeds.");
 				return;
 			}
 			
 			if (args[0].equals("--doc")) {
-				/* create documentation files in folder JARNAME_doc where JARNAME.jar is the jar file's name, then open documentation for this class
-				 * in the default .html program
-				 */
-				
-				// get path to this class within the jar, as well as the path of the jar
-				String pathInJar = PresidentAggregateRanker.class.getResource(PresidentAggregateRanker.class.getSimpleName() + ".class")
-						.getFile();
-				URL resource = ClassLoader.getSystemClassLoader().getResource(pathInJar);
-				if (resource == null) {
-					System.out.println("Program does not appear to be run from a .jar file; exiting.");
-					return;
-				}
-				String jarPathString = resource.getFile();
-				jarPathString = jarPathString.substring(6, jarPathString.lastIndexOf('!'));
-				
-				boolean jarInitSuccess = false; // if initializing or closing ZipFile throws IOException, this tells us which one
-				try (ZipFile jar = new ZipFile(jarPathString)) {
-					jarInitSuccess = true;
-					
-					// get path of the doc directory we will create
-					Path jarPath = Paths.get(jarPathString);
-					String jarName = jarPath.getFileName().toString();
-					int extIndex = jarName.lastIndexOf('.');
-					if (extIndex != -1)
-						jarName = jarName.substring(0, extIndex);
-					Path docDirectory = jarPath.getParent().resolve(jarName + "_doc");
-					boolean docDirectoryAlreadyExists = false;
-					
-					if (Files.exists(docDirectory, LinkOption.NOFOLLOW_LINKS)) {
-						// if doc folder already exists, empty it (or if it's not a folder, delete it) or exit
-						
-						boolean isDirectory = Files.isDirectory(docDirectory, LinkOption.NOFOLLOW_LINKS);
-						docDirectoryAlreadyExists = isDirectory;
-							
-						System.out.println((isDirectory ? "Doc folder already exists: " : "File already exists with doc folder's name: ")
-								+ docDirectory);
-						boolean askToDelete = args.length < 2 || args[1] == null;
-						boolean deleteDocs = askToDelete ? false : args[1].equals("y");
-						if (askToDelete) {
-							System.out.print((isDirectory ? "Delete doc folder contents?" : "Delete file?")
-									+ " (Otherwise exits.) If yes enter \"y\": ");
-							deleteDocs = sc.nextLine().equalsIgnoreCase("y");
-						}
-						
-						if (deleteDocs)
-							try {
-								if (isDirectory) {
-									emptyFolder(docDirectory);
-									System.out.println("Doc folder contents deleted.");
-								} else {
-									Files.delete(docDirectory);
-									System.out.println("File deleted.");
-								}
-							} catch (IOException e) {
-								System.out.println((isDirectory ? "ERROR: failed to delete doc folder contents." : "ERROR: failed to delete file.")
-										+ " Error message:");
-								e.printStackTrace();
-								return;
-							}
-						else
-							return;
-					}
-					
-					if (!docDirectoryAlreadyExists) // create doc folder
-						try {
-							Files.createDirectory(docDirectory);
-							System.out.println("Doc folder created: " + docDirectory);
-						} catch (IOException e) {
-							System.out.println("ERROR: doc folder creation failed: " + docDirectory);
-							System.out.println("Error message:");
-							e.printStackTrace();
-							return;
-						}
-					
-					// create documentation files
-					try {
-						for (ZipEntry entry : Collections.list(jar.entries())) {
-							if (entry.getName().startsWith("doc/")) {
-								String[] pathComponents = entry.getName().substring("doc/".length()).split("/");
-								Path outputFile = Paths.get(docDirectory.toString(), pathComponents);
-								
-								// if entry is directory create entry, otherwise create entry's parent folder
-								boolean entryIsDirectory = entry.isDirectory();
-								Files.createDirectories(entryIsDirectory ? outputFile : outputFile.getParent());
-								
-								// write to file
-								if (!entryIsDirectory)
-									try (
-											InputStream in = jar.getInputStream(entry);
-											OutputStream out = new FileOutputStream(outputFile.toString());
-									) {
-										byte[] buffer = new byte[in.available()];
-										in.read(buffer);
-										out.write(buffer);
-									}
-							}
-						}
-					} catch (IOException e) {
-						System.out.println("ERROR: failed to create documentation. Error message:");
-						e.printStackTrace();
-						return;
-					}
-					System.out.println("Documentation created.");
-					
-					// open documentation
-					try {
-						Path htmlPath = Paths.get(docDirectory.toString(), (pathInJar.substring(0, pathInJar.length() - "class".length()) + "html")
-								.split("/"));
-						Desktop.getDesktop().open(htmlPath.toFile());
-					} catch (IOException e) {
-						System.out.println("ERROR: failed to open documentation. Error message:");
-						e.printStackTrace();
-						return;
-					}
-					System.out.println("Documentation opened.");
-					
-				} catch (IOException e) { // this can happen during initialization or closing of ZipFile
-					if (jarInitSuccess)
-						System.out.println("ERROR: failed to close stream (you don't need to care about this). Error message:");
-					else
-						System.out.println("ERROR: failed to open .jar file for reading. Error message:");
-					e.printStackTrace();
-					return;
-				}
-				
+				createAndOpenJavadoc(args);
 				return;
 			}
 		}
+		
+		@SuppressWarnings("resource")
+		Scanner sc = new Scanner(System.in);
 		
 		System.out.println("Run with argument --help or --doc for info and usage.\n\n");
 		
@@ -497,10 +505,11 @@ public class PresidentAggregateRanker {
 		Path file = Paths.get(defaultPathUsed ? defaultPath : args[0]);
 		Boolean tableHasAggregate = args == null || args.length < 2 || args[1] == null ? null : args[1].equalsIgnoreCase("y");
 		
+		boolean pathEntered = false;
 		if (defaultPathUsed && !Files.exists(file)) { // if file isn't found at the default path
 			System.out.print("Enter path to .csv file: ");
 			file = Paths.get(sc.nextLine());
-			System.out.println("\n");
+			pathEntered = true;
 		}
 		
 		// read table as List<String[]> and convert to String[][]
@@ -517,6 +526,9 @@ public class PresidentAggregateRanker {
 			e.printStackTrace();
 			return;
 		}
+		
+		if (pathEntered)
+			System.out.println("\n");
 		
 		int tableHeight = table.length;
 		int tableWidth = table[0].length;
