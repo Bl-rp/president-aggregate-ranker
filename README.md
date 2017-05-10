@@ -12,9 +12,13 @@ To run this program, download the .jar from the 'releases' tab of the project's 
 The table is assumed to contain individual presidents in each row except the first and last, and individual polls in each column except the first three and, if the table has an aggregate, the last. The first row should be a header and the last should display total number of presidents ranked per poll. The first column should contain president numbers, the second should contain president names, the third should contain party affiliations, and if an aggregate is present it should be found in the last column. The program checks for the following criteria and prints an error message and exits if not all hold true:
 
 *All rows have equal length.
+
 *First row's first three entries are or start with "No.", "President", "Political party".
+
 *First row's last entry is or starts with "Aggr." or user specifies that the table has no aggregate.
+
 *Last row's second entry is or starts with "Total in survey".
+
 *There is some string X such that entries that are not in the first or last row or the first three columns, or last column if the table has an aggregate, are either integers optionally followed by " (tie)" or " *" or both, or identical to X (indicating 'not ranked').
 
 The program also checks that the 'Total in survey' numbers are correct and prints corrections if any are wrong, but doesn't exit.
