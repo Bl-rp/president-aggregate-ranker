@@ -77,12 +77,12 @@ import com.opencsv.CSVReader;
  * 
  * <p>The program also checks that the 'Total in survey' numbers are correct and prints corrections if any are wrong, but doesn't exit.
  * 
- * <p><b>Dependency</b>: CSVReader 3.9 (packaged into the .jar)
+ * <p><b>Dependency</b>: opencsv 3.9 (packaged into the .jar)
  * 
  * @author Joakim Andersson<br>
  * {@literal j.ason@live.se}<br>
  * Date: 2017-05-11
- * @version 0.1.1
+ * @version 0.1.2
  */
 
 public class PresidentAggregateRanker {
