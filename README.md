@@ -18,3 +18,5 @@ The table is assumed to contain individual presidents in each row except the fir
 * There is some string X such that entries that are not in the first or last row or the first three columns, or last column if the table has an aggregate, are either integers optionally followed by " (tie)" or " *" or both, or identical to X (indicating 'not ranked').
 
 The program also checks that the 'Total in survey' numbers are correct and prints corrections if any are wrong, but doesn't exit.
+
+**Dependency**: opencsv 3.9 (packaged into the .jar)
