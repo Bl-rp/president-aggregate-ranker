@@ -81,8 +81,7 @@ import com.opencsv.CSVReader;
  * 
  * @author Joakim Andersson<br>
  * {@literal j.ason@live.se}<br>
- * Date: 2017-05-11
- * @version 0.1.2
+ * Date: 2017-06-16
  */
 
 public class PresidentAggregateRanker {
