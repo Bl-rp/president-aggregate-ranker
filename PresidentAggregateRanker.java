@@ -509,7 +509,10 @@ public class PresidentAggregateRanker {
 		boolean pathEntered = false;
 		if (defaultPathUsed && !Files.exists(file)) { // if file isn't found at the default path
 			System.out.print("Enter path to .csv file: ");
-			file = Paths.get(sc.nextLine());
+			String enteredPath = sc.nextLine();
+			if (enteredPath.isEmpty())
+				return;
+			file = Paths.get(enteredPath);
 			pathEntered = true;
 		}
 		
