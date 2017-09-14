@@ -8,13 +8,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Scanner;
@@ -52,13 +49,11 @@ import com.opencsv.CSVReader;
  * 
  * <p><b>Usage</b>: if the first argument is {@code --help}, prints short help text describing usage, then exits. If the first argument is
  * {@code --doc}, creates javadoc files in folder {@code JARNAME_doc} - where, again, {@code JARNAME} is the name of the .jar being run - within the
- * .jar's folder and opens the main class' documentation file in the default .html program, then exits; if the doc folder (or a file with that name)
- * already exists, prompts user for whether to empty it (or if it's a file, delete it) or cancel and exit unless there's a second argument which is
- * then taken as the answer which should be {@code y} if yes and anything else for no. If the first argument is not {@code --help} or {@code --doc},
- * first argument is taken as the path to the .csv file; if no arguments, path {@code US-president-rankings-table.csv} is taken as default, and if
- * the table is not found at this location, the user is prompted for the path. Second argument should be {@code y} if the table already has an
- * aggregate, and anything else otherwise; this is only used if no aggregate is found. If {@code y}, the program prints an error message and exits;
- * otherwise the program proceeds. If no second argument, the user is prompted for input as needed.
+ * .jar's folder and opens the main class' documentation file in the default .html program, then exits. If the first argument is not {@code --help}
+ * or {@code --doc}, first argument is taken as the path to the .csv file; if no arguments, path {@code US-president-rankings-table.csv} is taken as
+ * default, and if the table is not found at this location, the user is prompted for the path. Second argument should be {@code y} if the table
+ * already has an aggregate, and anything else otherwise; this is only used if no aggregate is found. If {@code y}, the program prints an error
+ * message and exits; otherwise the program proceeds. If no second argument, the user is prompted for input as needed.
  * 
  * <p>The table is assumed to contain individual presidents in each row except the first and last, and individual polls in each column except the
  * first three and, if the table has an aggregate, the last. The first row should be a header and the last should display total number of presidents
@@ -77,22 +72,26 @@ import com.opencsv.CSVReader;
  * 
  * <p>The program also checks that the 'Total in survey' numbers are correct and prints corrections if any are wrong, but doesn't exit.
  * 
- * <p><b>Dependency</b>: opencsv 3.9 (packaged into the .jar)
+ * <p><b>Dependencies</b> (packaged into the .jar): opencsv 4.0, commons-beanutils 1.9.3, commons-lang3 3.6, commons-text 1.1, commons-collections
+ * 3.2.2, commons-logging 1.2
  * 
  * @author Joakim Andersson<br>
  * {@literal j.ason@live.se}<br>
- * Date: 2017-06-16
+ * Date: 2017-09-14
  */
 
 public class PresidentAggregateRanker {
 	private PresidentAggregateRanker() {} // so constructor doesn't show up in documentation
 	
+	private static Scanner sc = new Scanner(System.in);
+	
 	private static class President implements Comparable<President> {
+		
 		// set aggregateScore to this to indicate that the president is not included in any polls and thus has 0 victories and defeats
 		private static final RationalNumber noScore = new RationalNumber(-1,1);
 		
 		public final String name;
-		public final String presidentNumber; // number in chronological order (e.g. George Washington's number is 01, Grover Cleveland's is 22/24)
+		public final String presidentNumber; // number in chronological order (e.g. George Washington's number is 01; Grover Cleveland's is 22/24)
 		
 		public int victories; // number of favourable pairwise comparisons across all polls
 		public int defeats; // number of unfavourable pairwise comparisons across all polls
@@ -250,41 +249,41 @@ public class PresidentAggregateRanker {
 	}
 	
 	private static void wrongCellValue(String[][] table, int row, int column, String value) {
-		/* used to tell the user that a cell has an unexpected value (before exiting by returning from main method). startsWith() instead of equals()
-		 * because there may be references
+		/* used to tell the user that a cell has an unexpected value (before exiting by returning from main method)
 		 */
 		System.out.println("ERROR: cell " + rowAndColumnToCellName(row, column) + " has value \"" + table[row][column] + "\", should be or start "
 				+ "with \"" + value + "\".");
 	}
 	
-	private static void emptyFolder(Path folder) throws IOException {
-		// delete contents of folder
-		for (Object file : Files.list(folder).toArray())
-			deleteFile((Path)file);
-	}
-	
-	private static void deleteFile(Path file) throws IOException {
-		/* if file is symlink, delete it (not the symlink's target). If file is regular file, delete. If file is folder, delete contents without
-		 * following symlinks (so nothing outside the folder is deleted), then delete folder
-		 */
-		
-		if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS))
-			Files.walkFileTree(file, new SimpleFileVisitor<Path>() {
-			   @Override
-			   public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-			       Files.delete(file);
-			       return FileVisitResult.CONTINUE;
-			   }
-	
-			   @Override
-			   public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-			       Files.delete(dir);
-			       return FileVisitResult.CONTINUE;
-			   }
-			});
-		else
-			Files.delete(file); // does not follow symlinks
-	}
+	// these methods are not used because deleting or emptying a folder in java is not safe due to folder hard links / junctions
+//	private static void emptyFolder(Path folder) throws IOException {
+//		// delete contents of folder
+//		for (Path file : (Iterable<Path>)Files.list(folder)::iterator)
+//			deleteFile(file);
+//	}
+//	
+//	private static void deleteFile(Path file) throws IOException {
+//		/* if file is symlink, delete it (not the symlink's target). If file is regular file, delete. If file is folder, delete contents without
+//		 * following symlinks (so nothing outside the folder is deleted), then delete folder
+//		 */
+//		
+//		if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS))
+//			Files.walkFileTree(file, new SimpleFileVisitor<Path>() {
+//			   @Override
+//			   public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+//			       Files.delete(file);
+//			       return FileVisitResult.CONTINUE;
+//			   }
+//	
+//			   @Override
+//			   public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+//			       Files.delete(dir);
+//			       return FileVisitResult.CONTINUE;
+//			   }
+//			});
+//		else
+//			Files.delete(file); // does not follow symlinks
+//	}
 	
 	private static Integer parseInteger(String s) {
 		// copied from java.lang.Integer.parseInt(). Returns null for non-integer string instead of throwing exception
@@ -335,9 +334,6 @@ public class PresidentAggregateRanker {
 		 * default .html program
 		 */
 		
-		@SuppressWarnings("resource")
-		Scanner sc = new Scanner(System.in);
-		
 		// get path to this class within the jar, as well as the path of the jar
 		String pathInJar = PresidentAggregateRanker.class.getResource(PresidentAggregateRanker.class.getSimpleName() + ".class").getFile();
 		URL resource = ClassLoader.getSystemClassLoader().getResource(pathInJar);
@@ -362,36 +358,37 @@ public class PresidentAggregateRanker {
 			boolean docDirectoryAlreadyExists = false;
 			
 			if (Files.exists(docDirectory, LinkOption.NOFOLLOW_LINKS)) {
-				// if doc folder already exists, empty it (or if it's not a folder, delete it) or exit
+				// exit if doc folder already exists
 				
 				boolean isDirectory = Files.isDirectory(docDirectory, LinkOption.NOFOLLOW_LINKS);
 				docDirectoryAlreadyExists = isDirectory;
 					
 				System.out.println((isDirectory ? "Doc folder already exists: " : "File already exists with doc folder's name: ") + docDirectory);
-				boolean askToDelete = args.length < 2 || args[1] == null;
-				boolean deleteDocs = askToDelete ? false : args[1].equals("y");
-				if (askToDelete) {
-					System.out.print((isDirectory ? "Delete doc folder contents?" : "Delete file?") + " (Otherwise exits.) If yes enter \"y\": ");
-					deleteDocs = sc.nextLine().equalsIgnoreCase("y");
-				}
-				
-				if (deleteDocs)
-					try {
-						if (isDirectory) {
-							emptyFolder(docDirectory);
-							System.out.println("Doc folder contents deleted.");
-						} else {
-							Files.delete(docDirectory);
-							System.out.println("File deleted.");
-						}
-					} catch (IOException e) {
-						System.out.println((isDirectory ? "ERROR: failed to delete doc folder contents." : "ERROR: failed to delete file.")
-								+ " Error message:");
-						e.printStackTrace();
-						return;
-					}
-				else
-					return;
+				return; // deleting or emptying a folder in java is not safe because of folder hard links / junctions
+//				boolean askToDelete = args.length < 2 || args[1] == null;
+//				boolean deleteDocs = askToDelete ? false : args[1].equals("y");
+//				if (askToDelete) {
+//					System.out.print((isDirectory ? "Delete doc folder contents?" : "Delete file?") + " (Otherwise exits.) If yes enter \"y\": ");
+//					deleteDocs = sc.nextLine().equalsIgnoreCase("y");
+//				}
+//				
+//				if (deleteDocs)
+//					try {
+//						if (isDirectory) {
+//							emptyFolder(docDirectory);
+//							System.out.println("Doc folder contents deleted.");
+//						} else {
+//							Files.delete(docDirectory);
+//							System.out.println("File deleted.");
+//						}
+//					} catch (IOException e) {
+//						System.out.println((isDirectory ? "ERROR: failed to delete doc folder contents." : "ERROR: failed to delete file.")
+//								+ " Error message:");
+//						e.printStackTrace();
+//						return;
+//					}
+//				else
+//					return;
 			}
 			
 			if (!docDirectoryAlreadyExists) // create doc folder
@@ -461,8 +458,7 @@ public class PresidentAggregateRanker {
 	 * @param args first argument (optional) is path to .csv file; second argument (optional) is {@code y} if table has aggregate (only used if
 	 * aggregate is not found in table) and anything else otherwise. Alternatively, if first argument is {@code --help}, prints help text, or if
 	 * {@code --doc}, creates javadoc files in folder {@code JARNAME_doc} where {@code JARNAME.jar} is the .jar file's name and opens the main class'
-	 * documentation in the default .html program; if doc folder already exists (or file with that name), second argument (optional) is {@code y} if
-	 * doc folder is to be emptied (or, if it's a file, it is to be deleted) before proceeding and anything else if program is to cancel and exit
+	 * documentation in the default .html program
 	 */
 	public static void main(String[] args) {
 		System.out.println();
@@ -480,13 +476,11 @@ public class PresidentAggregateRanker {
 						+ "and arg2 are the (optional) arguments. If arg1 is \"--help\", the program prints help text and exits. If arg1 is "
 						+ "\"--doc\", documentation files are created in the folder JARNAME_doc within the .jar file's folder, and the "
 						+ "documentation is then opened in the default program for .html files (probably your web browser); the program then exits. "
-						+ "If the doc folder already exists (or a file with that name) and arg2 is given, the folder will be emptied (or deleted if "
-						+ "it's a file) if arg2 is \"y\" and exit otherwise; if arg2 is not given, the user will be prompted. If arg1 is not "
-						+ "\"--help\" or \"--doc\", arg1 is taken as the path to the .csv file. If no arguments, the default path for the .csv file "
-						+ "is \"US-president-rankings-table.csv\". If the file isn't found at this location, the user will be prompted for the "
-						+ "path. arg2, if given, should be \"y\" if the table has an aggregate and anything else otherwise. It is only used if no "
-						+ "aggregate is found in the table, and if not given, the user will be prompted at this point. If \"y\", the program prints "
-						+ "an error message and exits; otherwise the program proceeds.");
+						+ "If arg1 is not \"--help\" or \"--doc\", arg1 is taken as the path to the .csv file. If no arguments, the default path "
+						+ "for the .csv file is \"US-president-rankings-table.csv\", and if the file isn't found at this location, the user will be "
+						+ "prompted for the path. arg2, if given, should be \"y\" if the table has an aggregate and anything else otherwise. It is "
+						+ "only used if no aggregate is found in the table, and if not given, the user will be prompted at this point. If \"y\", "
+						+ "the program prints an error message and exits; otherwise the program proceeds.");
 				return;
 			}
 			
@@ -495,9 +489,6 @@ public class PresidentAggregateRanker {
 				return;
 			}
 		}
-		
-		@SuppressWarnings("resource")
-		Scanner sc = new Scanner(System.in);
 		
 		System.out.println("Run with argument --help or --doc for info and usage.\n\n");
 		
