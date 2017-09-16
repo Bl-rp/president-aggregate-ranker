@@ -77,7 +77,7 @@ import com.opencsv.CSVReader;
  * 
  * @author Joakim Andersson<br>
  * {@literal j.ason@live.se}<br>
- * Date: 2017-09-14
+ * Date: 2017-09-16
  */
 
 public class PresidentAggregateRanker {
@@ -640,7 +640,12 @@ public class PresidentAggregateRanker {
 				presidentsSortedByAggregate[i].aggregateRank = null;
 			
 			else {
-				presidentsSortedByAggregate[i].aggregateRank = "" + (i+1);
+				int rank = i+1;
+				if (presidentsSortedByAggregate[i].tied)
+					for (int j = i-1; j >= 0 && presidentsSortedByAggregate[i].compareTo(presidentsSortedByAggregate[j]) == 0; j--)
+						rank--;
+				
+				presidentsSortedByAggregate[i].aggregateRank = "" + rank;
 				if (presidentsSortedByAggregate[i].aggregateRank.length() == 1)
 					presidentsSortedByAggregate[i].aggregateRank = "0" + presidentsSortedByAggregate[i].aggregateRank;
 				
@@ -648,7 +653,7 @@ public class PresidentAggregateRanker {
 					presidentsSortedByAggregate[i].aggregateRank += tie;
 			}
 		}
-				
+		
 		// check that the survey totals in table are correct; otherwise print corrections and correct totalInSurvey
 		boolean wrongTotalInSurveyFound = false;
 		for (int pollIndex = 0; pollIndex < numPollsInclAggr; pollIndex++) {
@@ -683,17 +688,19 @@ public class PresidentAggregateRanker {
 		for (int i = 0; i < outputColumnWidth.length; i++)
 			outputColumnWidth[i] += 5;
 		
-		System.out.println("Presidents sorted by number: number - name - rank - score");
+		String row = "%-" + outputColumnWidth[0] + "s %-" + outputColumnWidth[1] + "s %-" + outputColumnWidth[2] + "s %s\n";
+		
+		System.out.println("Presidents sorted by number:\n");
+		System.out.printf(row, "number", "name", "rank", "score");
 		for (President p : presidents)
-			System.out.printf("%-" + outputColumnWidth[0] + "s %-" + outputColumnWidth[1] + "s %-" + outputColumnWidth[2] + "s %s\n",
-					p.presidentNumber, p.name, p.aggregateRank, p.getScore());
+			System.out.printf(row, p.presidentNumber, p.name, p.aggregateRank, p.getScore());
 		
 		System.out.println("\n");
 		
-		System.out.println("Presidents sorted by rank: number - name - rank - score");
+		System.out.println("Presidents sorted by rank:\n");
+		System.out.printf(row, "number", "name", "rank", "score");
 		for (President p : presidentsSortedByAggregate)
-			System.out.printf("%-" + outputColumnWidth[0] + "s %-" + outputColumnWidth[1] + "s %-" + outputColumnWidth[2] + "s %s\n",
-					p.presidentNumber, p.name, p.aggregateRank, p.getScore());
+			System.out.printf(row, p.presidentNumber, p.name, p.aggregateRank, p.getScore());
 		
 		System.out.println("\n");
 		
